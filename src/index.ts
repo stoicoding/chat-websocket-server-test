@@ -20,17 +20,38 @@ mongoose.set('debug', true); // Enable mongoose debug mode
 
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URL;
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/messenger-chat';
     if (!mongoUri) {
       throw new Error('MongoDB URI environment variable is not set');
     }
 
     console.log('Attempting to connect to MongoDB...');
-    const conn = await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+    
+    // Determine if we're connecting to Railway (contains 'railway' or 'rlwy' in the URI)
+    const isRailway = mongoUri.includes('railway') || mongoUri.includes('rlwy');
+    
+    // Set connection options based on environment
+    const connectionOptions = {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
       retryWrites: true,
-      w: 'majority'
+      ...(isRailway ? {
+        ssl: true,
+        tls: true,
+        tlsAllowInvalidCertificates: true
+      } : {
+        ssl: false,
+        tls: false
+      })
+    };
+
+    console.log('MongoDB connection options:', {
+      ...connectionOptions,
+      uri: mongoUri.replace(/\/\/[^@]+@/, '//****:****@') // Hide credentials in logs
     });
+
+    const conn = await mongoose.connect(mongoUri, connectionOptions);
 
     console.log('MongoDB Connected Successfully:', {
       host: conn.connection.host,
@@ -50,9 +71,7 @@ const connectDB = async () => {
   } catch (error) {
     console.error('MongoDB connection error:', error);
     console.error('Environment variables:', {
-      MONGODB_URI: process.env.MONGODB_URI ? '[HIDDEN]' : 'NOT SET',
-      MONGO_URL: process.env.MONGO_URL ? '[HIDDEN]' : 'NOT SET',
-      NODE_ENV: process.env.NODE_ENV
+      MONGODB_URI: process.env.MONGODB_URI ? '[HIDDEN]' : 'NOT SET'
     });
     // Don't exit the process, let it retry
     setTimeout(connectDB, 5000); // Retry after 5 seconds
