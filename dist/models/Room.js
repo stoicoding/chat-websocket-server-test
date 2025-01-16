@@ -47,6 +47,5 @@ RoomSchema.pre('save', function (next) {
     next();
 });
 // Indexes for faster querying
-RoomSchema.index({ roomId: 1 });
 RoomSchema.index({ participants: 1 });
 exports.default = mongoose_1.default.model('Room', RoomSchema);
