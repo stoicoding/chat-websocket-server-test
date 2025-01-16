@@ -8,7 +8,8 @@ import { NotificationService } from './services/NotificationService';
 dotenv.config();
 
 const app = express();
-const port = parseInt(process.env.PORT || '3000', 10);
+const port = process.env.PORT || 3000;
+const wsPort = parseInt(process.env.WS_PORT || '8080');
 const useMockResponses = process.env.USE_MOCK_RESPONSES === 'true';
 
 // Middleware
@@ -71,26 +72,10 @@ app.post('/register-device', async (req: Request, res: Response): Promise<void> 
 });
 
 // Initialize WebSocket server
-export const wsServer = new WebSocketServer(port, useMockResponses);
+export const wsServer = new WebSocketServer(wsPort, useMockResponses);
 
 // Start HTTP server
-const startServer = (retryPort: number = port) => {
-  try {
-    app.listen(retryPort, () => {
-      console.log(`HTTP Server running on port ${retryPort}`);
-      console.log(`WebSocket Server running on port ${retryPort}`);
-      console.log('Mock responses are', useMockResponses ? 'enabled' : 'disabled');
-    }).on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE') {
-        console.log(`Port ${retryPort} is busy, trying ${retryPort + 1}...`);
-        startServer(retryPort + 1);
-      } else {
-        console.error('Server error:', err);
-      }
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-  }
-};
-
-startServer();
+app.listen(port, () => {
+  console.log(`HTTP Server running on port ${port}`);
+  console.log(`WebSocket Server running on port ${wsPort}`);
+});
