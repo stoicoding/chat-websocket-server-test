@@ -84,11 +84,11 @@ const connectDB = async () => {
         // Log all relevant environment variables for debugging
         console.error('Environment variables:', {
             RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT || 'NOT SET',
-            MONGODB_URI: process.env.MONGODB_URI ? '[HIDDEN]' : 'NOT SET',
-            MONGO_USER: process.env.MONGO_USER ? '[HIDDEN]' : 'NOT SET',
-            MONGO_PASSWORD: process.env.MONGO_PASSWORD ? '[HIDDEN]' : 'NOT SET',
-            MONGO_HOST: process.env.MONGO_HOST ? '[HIDDEN]' : 'NOT SET',
-            MONGO_PORT: process.env.MONGO_PORT || 'NOT SET',
+            MONGO_URL: process.env.MONGO_URL ? '[HIDDEN]' : 'NOT SET',
+            MONGOUSER: process.env.MONGOUSER ? '[HIDDEN]' : 'NOT SET',
+            MONGOPASSWORD: process.env.MONGOPASSWORD ? '[HIDDEN]' : 'NOT SET',
+            MONGOHOST: process.env.MONGOHOST ? '[HIDDEN]' : 'NOT SET',
+            MONGOPORT: process.env.MONGOPORT || 'NOT SET',
             MONGO_DATABASE: process.env.MONGO_DATABASE || 'NOT SET'
         });
         // Retry connection after delay
