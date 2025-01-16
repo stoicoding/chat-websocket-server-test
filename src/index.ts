@@ -54,9 +54,10 @@ const connectDB = async () => {
       connectTimeoutMS: 10000,
       retryWrites: true,
       ...(isRailway ? {
-        ssl: true,
-        tls: true,
-        tlsAllowInvalidCertificates: true
+        ssl: false,
+        tls: false,
+        directConnection: true,
+        authSource: 'admin'
       } : {
         ssl: false,
         tls: false
