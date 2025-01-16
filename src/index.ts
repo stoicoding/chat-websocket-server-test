@@ -24,14 +24,14 @@ const connectDB = async () => {
     const isRailway = process.env.RAILWAY_ENVIRONMENT === 'production';
     
     // Construct MongoDB URI based on environment
-    let mongoUri = process.env.MONGODB_URI; // Try using direct URI first
+    let mongoUri = process.env.MONGO_URL; // Try using direct URI first
     
     if (!mongoUri && isRailway) {
       // Construct URI from Railway's MongoDB variables
-      const username = process.env.MONGO_USER;
-      const password = process.env.MONGO_PASSWORD;
-      const host = process.env.MONGO_HOST || 'monorail.proxy.rlwy.net';
-      const port = process.env.MONGO_PORT || '27017';
+      const username = process.env.MONGOUSER;
+      const password = process.env.MONGOPASSWORD;
+      const host = process.env.MONGOHOST || 'monorail.proxy.rlwy.net';
+      const port = process.env.MONGOPORT || '27017';
       const database = process.env.MONGO_DATABASE || 'messenger-chat';
       
       mongoUri = `mongodb://${username}:${password}@${host}:${port}/${database}`;
