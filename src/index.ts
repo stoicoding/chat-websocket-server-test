@@ -20,17 +20,34 @@ mongoose.set('debug', true); // Enable mongoose debug mode
 
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/messenger-chat';
+    // Check if we're running on Railway
+    const isRailway = process.env.RAILWAY_ENVIRONMENT === 'production';
+    
+    // Construct MongoDB URI based on environment
+    let mongoUri = process.env.MONGODB_URI; // Try using direct URI first
+    
+    if (!mongoUri && isRailway) {
+      // Construct URI from Railway's MongoDB variables
+      const username = process.env.MONGO_USER;
+      const password = process.env.MONGO_PASSWORD;
+      const host = process.env.MONGO_HOST || 'monorail.proxy.rlwy.net';
+      const port = process.env.MONGO_PORT || '27017';
+      const database = process.env.MONGO_DATABASE || 'messenger-chat';
+      
+      mongoUri = `mongodb://${username}:${password}@${host}:${port}/${database}`;
+    } else {
+      // Local development fallback
+      mongoUri = mongoUri || 'mongodb://localhost:27017/messenger-chat';
+    }
+
     if (!mongoUri) {
-      throw new Error('MongoDB URI environment variable is not set');
+      throw new Error('Could not construct MongoDB URI. Please check environment variables.');
     }
 
     console.log('Attempting to connect to MongoDB...');
+    console.log(`Environment: ${isRailway ? 'Railway' : 'Local'}`);
     
-    // Determine if we're connecting to Railway (contains 'railway' or 'rlwy' in the URI)
-    const isRailway = mongoUri.includes('railway') || mongoUri.includes('rlwy');
-    
-    // Set connection options based on environment
+    // Connection options based on environment
     const connectionOptions = {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
@@ -46,9 +63,10 @@ const connectDB = async () => {
       })
     };
 
+    // Log connection attempt (hiding sensitive info)
     console.log('MongoDB connection options:', {
       ...connectionOptions,
-      uri: mongoUri.replace(/\/\/[^@]+@/, '//****:****@') // Hide credentials in logs
+      uri: mongoUri.replace(/\/\/[^@]+@/, '//****:****@')
     });
 
     const conn = await mongoose.connect(mongoUri, connectionOptions);
@@ -59,22 +77,32 @@ const connectDB = async () => {
       collections: Object.keys(conn.connection.collections)
     });
 
-    // Log when disconnected
+    // Connection event handlers
     mongoose.connection.on('disconnected', () => {
-      console.log('MongoDB disconnected');
+      console.log('MongoDB disconnected, attempting to reconnect...');
+      setTimeout(connectDB, 5000);
     });
 
     mongoose.connection.on('error', (err) => {
       console.error('MongoDB connection error:', err);
+      setTimeout(connectDB, 5000);
     });
 
   } catch (error) {
     console.error('MongoDB connection error:', error);
+    // Log all relevant environment variables for debugging
     console.error('Environment variables:', {
-      MONGODB_URI: process.env.MONGODB_URI ? '[HIDDEN]' : 'NOT SET'
+      RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT || 'NOT SET',
+      MONGODB_URI: process.env.MONGODB_URI ? '[HIDDEN]' : 'NOT SET',
+      MONGO_USER: process.env.MONGO_USER ? '[HIDDEN]' : 'NOT SET',
+      MONGO_PASSWORD: process.env.MONGO_PASSWORD ? '[HIDDEN]' : 'NOT SET',
+      MONGO_HOST: process.env.MONGO_HOST ? '[HIDDEN]' : 'NOT SET',
+      MONGO_PORT: process.env.MONGO_PORT || 'NOT SET',
+      MONGO_DATABASE: process.env.MONGO_DATABASE || 'NOT SET'
     });
-    // Don't exit the process, let it retry
-    setTimeout(connectDB, 5000); // Retry after 5 seconds
+    
+    // Retry connection after delay
+    setTimeout(connectDB, 5000);
   }
 };
 
