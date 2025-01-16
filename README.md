@@ -13,7 +13,6 @@ A WebSocket server implementation with Express and TypeScript.
 1. Clone the repository:
 ```bash
 git clone git@github.com:stoicoding/chat-websocket-server-test.git
-cd yo-websocket-server-test
 ```
 
 2. Install dependencies:
