@@ -64,10 +64,40 @@ app.post('/register-device', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
-// Initialize WebSocket server
-exports.wsServer = new websocket_1.WebSocketServer(wsPort, useMockResponses);
-// Start HTTP server
-app.listen(port, () => {
-    console.log(`HTTP Server running on port ${port}`);
-    console.log(`WebSocket Server running on port ${wsPort}`);
-});
+// Initialize WebSocket server with retry logic
+const startWebSocketServer = (retryPort = wsPort) => {
+    try {
+        const ws = new websocket_1.WebSocketServer(retryPort, useMockResponses);
+        console.log(`WebSocket Server running on port ${retryPort}`);
+        return ws;
+    }
+    catch (error) {
+        if (error.code === 'EADDRINUSE') {
+            console.log(`WebSocket port ${retryPort} is busy, trying ${retryPort + 1}...`);
+            return startWebSocketServer(retryPort + 1);
+        }
+        throw error;
+    }
+};
+// Start HTTP server with retry logic
+const startHTTPServer = (retryPort = parseInt(port.toString())) => {
+    try {
+        app.listen(retryPort, () => {
+            console.log(`HTTP Server running on port ${retryPort}`);
+        }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                console.log(`HTTP port ${retryPort} is busy, trying ${retryPort + 1}...`);
+                startHTTPServer(retryPort + 1);
+            }
+            else {
+                console.error('HTTP Server error:', err);
+            }
+        });
+    }
+    catch (error) {
+        console.error('Failed to start HTTP server:', error);
+    }
+};
+// Initialize servers
+exports.wsServer = startWebSocketServer();
+startHTTPServer();
