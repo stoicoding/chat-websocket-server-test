@@ -119,28 +119,7 @@ class WebSocketServer {
                                 }
                             });
                             if (this.useMockResponses) {
-                                // Create and save bot response
-                                const mockResponse = new Message_1.default({
-                                    roomId: initialMessage.roomId,
-                                    senderId: 'bot',
-                                    senderName: 'ChatBot',
-                                    content: this.getRandomResponse(),
-                                    timestamp: new Date()
-                                });
-                                await mockResponse.save();
-                                // Broadcast bot response to all clients in the room
-                                this.clients.forEach((client) => {
-                                    if (client.ws.readyState === ws_1.default.OPEN && client.roomId === initialMessage.roomId) {
-                                        client.ws.send(JSON.stringify({
-                                            type: 'message',
-                                            roomId: initialMessage.roomId,
-                                            senderId: mockResponse.senderId,
-                                            senderName: mockResponse.senderName,
-                                            content: mockResponse.content,
-                                            timestamp: mockResponse.timestamp
-                                        }));
-                                    }
-                                });
+                                await this.sendMockResponses(initialMessage.roomId);
                             }
                         }
                         catch (error) {
@@ -163,6 +142,45 @@ class WebSocketServer {
     getRandomResponse() {
         const response = this.mockResponses[Math.floor(Math.random() * this.mockResponses.length)];
         return response !== undefined ? response : "default response";
+    }
+    getRandomNumberOfResponses() {
+        // 50% chance to send multiple responses
+        const shouldSendMultiple = Math.random() < 0.5;
+        if (shouldSendMultiple) {
+            // Randomly choose between 2 or 3 responses
+            return Math.random() < 0.5 ? 2 : 3;
+        }
+        return 1;
+    }
+    async sendMockResponses(roomId) {
+        const numberOfResponses = this.getRandomNumberOfResponses();
+        for (let i = 0; i < numberOfResponses; i++) {
+            // Add a small delay between messages
+            if (i > 0) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            const mockResponse = new Message_1.default({
+                roomId: roomId,
+                senderId: 'bot',
+                senderName: 'ChatBot',
+                content: this.getRandomResponse(),
+                timestamp: new Date()
+            });
+            await mockResponse.save();
+            // Broadcast bot response to all clients in the room
+            this.clients.forEach((client) => {
+                if (client.ws.readyState === ws_1.default.OPEN && client.roomId === roomId) {
+                    client.ws.send(JSON.stringify({
+                        type: 'message',
+                        roomId: roomId,
+                        senderId: mockResponse.senderId,
+                        senderName: mockResponse.senderName,
+                        content: mockResponse.content,
+                        timestamp: mockResponse.timestamp
+                    }));
+                }
+            });
+        }
     }
     isValidChatMessage(message) {
         if (!message || typeof message !== 'object')
