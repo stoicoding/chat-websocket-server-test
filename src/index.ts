@@ -20,8 +20,19 @@ mongoose.set('debug', true); // Enable mongoose debug mode
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/messenger-chat');
-    console.log('MongoDB Connected:', {
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URL;
+    if (!mongoUri) {
+      throw new Error('MongoDB URI environment variable is not set');
+    }
+
+    console.log('Attempting to connect to MongoDB...');
+    const conn = await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      retryWrites: true,
+      w: 'majority'
+    });
+
+    console.log('MongoDB Connected Successfully:', {
       host: conn.connection.host,
       name: conn.connection.name,
       collections: Object.keys(conn.connection.collections)
@@ -32,19 +43,19 @@ const connectDB = async () => {
       console.log('MongoDB disconnected');
     });
 
-    // Log when reconnected
-    mongoose.connection.on('reconnected', () => {
-      console.log('MongoDB reconnected');
-    });
-
-    // Log all MongoDB operations in debug mode
-    mongoose.set('debug', (collectionName: string, method: string, ...args: any[]) => {
-      console.log(`MongoDB Debug - ${collectionName}.${method}`, args);
+    mongoose.connection.on('error', (err) => {
+      console.error('MongoDB connection error:', err);
     });
 
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    process.exit(1);
+    console.error('Environment variables:', {
+      MONGODB_URI: process.env.MONGODB_URI ? '[HIDDEN]' : 'NOT SET',
+      MONGO_URL: process.env.MONGO_URL ? '[HIDDEN]' : 'NOT SET',
+      NODE_ENV: process.env.NODE_ENV
+    });
+    // Don't exit the process, let it retry
+    setTimeout(connectDB, 5000); // Retry after 5 seconds
   }
 };
 
