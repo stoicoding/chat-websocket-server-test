@@ -2,18 +2,26 @@ import dotenv from 'dotenv';
 import express from 'express';
 import mongoose from 'mongoose';
 import bodyParser from 'body-parser';
+import cors from 'cors';
+import http from 'http';
 import { WebSocketServer } from './websocket';
 import router from './routes';
+import { logger } from './utils/logger';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
-const wsPort = parseInt(process.env.WS_PORT || '8080');
 const useMockResponses = process.env.USE_MOCK_RESPONSES === 'true';
 
 // Middleware
+app.use(cors());
 app.use(bodyParser.json());
+
+// Health check endpoint
+app.get('/health', (_, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Mount routes
 app.use(router);
@@ -113,39 +121,30 @@ const connectDB = async () => {
 // Initial connection
 connectDB();
 
-// Initialize WebSocket server with retry logic
-const startWebSocketServer = (retryPort: number = wsPort) => {
-  try {
-    const ws = new WebSocketServer(retryPort, useMockResponses);
-    console.log(`WebSocket Server running on port ${retryPort}`);
-    return ws;
-  } catch (error: any) {
-    if (error.code === 'EADDRINUSE') {
-      console.log(`WebSocket port ${retryPort} is busy, trying ${retryPort + 1}...`);
-      return startWebSocketServer(retryPort + 1);
-    }
-    throw error;
-  }
-};
+// Create HTTP server
+const server = http.createServer(app);
 
-// Start HTTP server with retry logic
-const startHTTPServer = (retryPort: number = parseInt(port.toString())) => {
+// Initialize WebSocket server with the HTTP server
+export const wsServer = new WebSocketServer(server, useMockResponses);
+
+// Start server with retry logic
+async function startServer(retryPort: number = parseInt(port.toString())) {
   try {
-    app.listen(retryPort, () => {
-      console.log(`HTTP Server running on port ${retryPort}`);
-    }).on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE') {
-        console.log(`HTTP port ${retryPort} is busy, trying ${retryPort + 1}...`);
-        startHTTPServer(retryPort + 1);
-      } else {
-        console.error('HTTP Server error:', err);
-      }
+    server.listen(retryPort, () => {
+      logger.info(`Server running on port ${retryPort}`);
+      logger.info(`WebSocket server attached to HTTP server`);
     });
   } catch (error) {
-    console.error('Failed to start HTTP server:', error);
+    logger.error(`Failed to start server on port ${retryPort}:`, error);
+    if (retryPort < retryPort + 10) {
+      logger.info(`Retrying with port ${retryPort + 1}...`);
+      await startServer(retryPort + 1);
+    } else {
+      logger.error('Failed to start server after 10 retries');
+      process.exit(1);
+    }
   }
-};
+}
 
-// Initialize servers
-export const wsServer = startWebSocketServer();
-startHTTPServer();
+// Initialize server
+startServer();

@@ -8,8 +8,9 @@ const ws_1 = __importDefault(require("ws"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const Message_1 = __importDefault(require("./models/Message"));
 const Room_1 = __importDefault(require("./models/Room"));
+const logger_1 = require("./utils/logger");
 class WebSocketServer {
-    constructor(port, useMockResponses = false) {
+    constructor(server, useMockResponses = false) {
         this.clients = new Map();
         this.mockResponses = [
             "なるほど、興味深いですね。もっと詳しく教えてください。",
@@ -23,10 +24,10 @@ class WebSocketServer {
             "そのような視点を持っていただき、感謝します。",
             "興味深い考えですね！"
         ];
-        this.wss = new ws_1.default.Server({ port });
+        this.wss = new ws_1.default.Server({ server, path: '/ws' });
         this.useMockResponses = useMockResponses;
-        console.log(`WebSocket Server initialized on port ${port}`);
-        console.log(`Mock responses are ${useMockResponses ? 'enabled' : 'disabled'}`);
+        logger_1.logger.info('WebSocket Server initialized');
+        logger_1.logger.info(`Mock responses are ${useMockResponses ? 'enabled' : 'disabled'}`);
         this.initialize();
     }
     initialize() {
@@ -37,7 +38,7 @@ class WebSocketServer {
                 try {
                     const initialMessage = JSON.parse(data.toString());
                     if (!initialMessage.userId || !initialMessage.roomId) {
-                        console.log('Missing userId or roomId in initial message');
+                        logger_1.logger.error('Missing userId or roomId in initial message');
                         ws.close();
                         return;
                     }
@@ -59,15 +60,15 @@ class WebSocketServer {
                         userId: initialMessage.userId,
                         roomId: initialMessage.roomId
                     });
-                    console.log(`Client connected: ${clientId} (User: ${initialMessage.userId}) in room: ${initialMessage.roomId}`);
-                    console.log(`Fetching chat history for room: ${initialMessage.roomId}`);
+                    logger_1.logger.info(`Client connected: ${clientId} (User: ${initialMessage.userId}) in room: ${initialMessage.roomId}`);
+                    logger_1.logger.info(`Fetching chat history for room: ${initialMessage.roomId}`);
                     // Log MongoDB connection status
-                    console.log('MongoDB connection state:', mongoose_1.default.connection.readyState);
+                    logger_1.logger.info('MongoDB connection state:', mongoose_1.default.connection.readyState);
                     // Send chat history for this room
                     const history = await Message_1.default.find({
                         roomId: initialMessage.roomId
                     }).sort({ timestamp: -1 }).limit(50);
-                    console.log('History query result:', {
+                    logger_1.logger.info('History query result:', {
                         count: history.length,
                         roomId: initialMessage.roomId,
                         messages: history.map(msg => ({
@@ -82,16 +83,16 @@ class WebSocketServer {
                         type: 'history',
                         messages: history
                     }));
-                    console.log('Chat history sent to client');
+                    logger_1.logger.info('Chat history sent to client');
                     // Handle subsequent messages
                     ws.on('message', async (messageData) => {
                         try {
                             const message = JSON.parse(messageData.toString());
                             if (!this.isValidChatMessage(message)) {
-                                console.error('Invalid message format:', message);
+                                logger_1.logger.error('Invalid message format:', message);
                                 return;
                             }
-                            console.log('Saving new message:', {
+                            logger_1.logger.info('Saving new message:', {
                                 roomId: initialMessage.roomId,
                                 senderId: message.senderId,
                                 content: message.content
@@ -104,7 +105,7 @@ class WebSocketServer {
                                 timestamp: new Date()
                             });
                             await newMessage.save();
-                            console.log('Message saved successfully with ID:', newMessage._id);
+                            logger_1.logger.info('Message saved successfully with ID:', newMessage._id);
                             // Broadcast to all clients in the same room
                             this.clients.forEach((client) => {
                                 if (client.ws.readyState === ws_1.default.OPEN && client.roomId === initialMessage.roomId) {
@@ -123,17 +124,17 @@ class WebSocketServer {
                             }
                         }
                         catch (error) {
-                            console.warn('Error processing message:', error);
+                            logger_1.logger.warn('Error processing message:', error);
                         }
                     });
                     // Handle client disconnection
                     ws.on('close', () => {
                         this.clients.delete(clientId);
-                        console.log(`Client disconnected: ${clientId}`);
+                        logger_1.logger.info(`Client disconnected: ${clientId}`);
                     });
                 }
                 catch (error) {
-                    console.error('Error processing initial message:', error);
+                    logger_1.logger.error('Error processing initial message:', error);
                     ws.close();
                 }
             });
@@ -196,7 +197,7 @@ class WebSocketServer {
             typeof msg.senderId !== 'string' ||
             typeof msg.senderName !== 'string' ||
             typeof msg.content !== 'string') {
-            console.error('Invalid message format:', {
+            logger_1.logger.error('Invalid message format:', {
                 type: msg.type,
                 roomId: msg.roomId,
                 senderId: msg.senderId,

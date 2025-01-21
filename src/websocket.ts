@@ -1,7 +1,9 @@
 import WebSocket from 'ws';
+import http from 'http';
 import mongoose from 'mongoose';
 import Message from './models/Message';
 import Room from './models/Room';
+import { logger } from './utils/logger';
 
 interface BaseMessage {
   type: string;
@@ -51,11 +53,11 @@ export class WebSocketServer {
     "興味深い考えですね！"
   ];
 
-  constructor(port: number, useMockResponses: boolean = false) {
-    this.wss = new WebSocket.Server({ port });
+  constructor(server: http.Server, useMockResponses: boolean = false) {
+    this.wss = new WebSocket.Server({ server, path: '/ws' });
     this.useMockResponses = useMockResponses;
-    console.log(`WebSocket Server initialized on port ${port}`);
-    console.log(`Mock responses are ${useMockResponses ? 'enabled' : 'disabled'}`);
+    logger.info('WebSocket Server initialized');
+    logger.info(`Mock responses are ${useMockResponses ? 'enabled' : 'disabled'}`);
     this.initialize();
   }
 
@@ -69,7 +71,7 @@ export class WebSocketServer {
           const initialMessage = JSON.parse(data.toString()) as InitialMessage;
           
           if (!initialMessage.userId || !initialMessage.roomId) {
-            console.log('Missing userId or roomId in initial message');
+            logger.error('Missing userId or roomId in initial message');
             ws.close();
             return;
           }
@@ -92,19 +94,19 @@ export class WebSocketServer {
             userId: initialMessage.userId,
             roomId: initialMessage.roomId 
           });
-          console.log(`Client connected: ${clientId} (User: ${initialMessage.userId}) in room: ${initialMessage.roomId}`);
+          logger.info(`Client connected: ${clientId} (User: ${initialMessage.userId}) in room: ${initialMessage.roomId}`);
 
-          console.log(`Fetching chat history for room: ${initialMessage.roomId}`);
+          logger.info(`Fetching chat history for room: ${initialMessage.roomId}`);
           
           // Log MongoDB connection status
-          console.log('MongoDB connection state:', mongoose.connection.readyState);
+          logger.info('MongoDB connection state:', mongoose.connection.readyState);
           
           // Send chat history for this room
           const history = await Message.find({ 
             roomId: initialMessage.roomId 
           }).sort({ timestamp: -1 }).limit(50);
           
-          console.log('History query result:', {
+          logger.info('History query result:', {
             count: history.length,
             roomId: initialMessage.roomId,
             messages: history.map(msg => ({
@@ -120,7 +122,7 @@ export class WebSocketServer {
             type: 'history',
             messages: history
           }));
-          console.log('Chat history sent to client');
+          logger.info('Chat history sent to client');
 
           // Handle subsequent messages
           ws.on('message', async (messageData: WebSocket.RawData) => {
@@ -128,11 +130,11 @@ export class WebSocketServer {
               const message = JSON.parse(messageData.toString()) as WSMessage;
               
               if (!this.isValidChatMessage(message)) {
-                console.error('Invalid message format:', message);
+                logger.error('Invalid message format:', message);
                 return;
               }
 
-              console.log('Saving new message:', {
+              logger.info('Saving new message:', {
                 roomId: initialMessage.roomId,
                 senderId: message.senderId,
                 content: message.content
@@ -146,7 +148,7 @@ export class WebSocketServer {
                 timestamp: new Date()
               });
               await newMessage.save();
-              console.log('Message saved successfully with ID:', newMessage._id);
+              logger.info('Message saved successfully with ID:', newMessage._id);
 
               // Broadcast to all clients in the same room
               this.clients.forEach((client) => {
@@ -166,18 +168,18 @@ export class WebSocketServer {
                 await this.sendMockResponses(initialMessage.roomId);
               }
             } catch (error) {
-              console.warn('Error processing message:', error);
+              logger.warn('Error processing message:', error);
             }
           });
 
           // Handle client disconnection
           ws.on('close', () => {
             this.clients.delete(clientId);
-            console.log(`Client disconnected: ${clientId}`);
+            logger.info(`Client disconnected: ${clientId}`);
           });
 
         } catch (error) {
-          console.error('Error processing initial message:', error);
+          logger.error('Error processing initial message:', error);
           ws.close();
         }
       });
@@ -250,7 +252,7 @@ export class WebSocketServer {
       typeof msg.senderName !== 'string' ||
       typeof msg.content !== 'string'
     ) {
-      console.error('Invalid message format:', {
+      logger.error('Invalid message format:', {
         type: msg.type,
         roomId: msg.roomId,
         senderId: msg.senderId,
