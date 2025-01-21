@@ -1,9 +1,9 @@
 import dotenv from 'dotenv';
-import express, { Request, Response } from 'express';
+import express from 'express';
 import mongoose from 'mongoose';
 import bodyParser from 'body-parser';
 import { WebSocketServer } from './websocket';
-import { NotificationService } from './services/NotificationService';
+import router from './routes';
 
 dotenv.config();
 
@@ -14,6 +14,9 @@ const useMockResponses = process.env.USE_MOCK_RESPONSES === 'true';
 
 // Middleware
 app.use(bodyParser.json());
+
+// Mount routes
+app.use(router);
 
 // Connect to MongoDB
 mongoose.set('debug', true); // Enable mongoose debug mode
@@ -109,26 +112,6 @@ const connectDB = async () => {
 
 // Initial connection
 connectDB();
-
-const notificationService = new NotificationService();
-
-// Device registration endpoint
-app.post('/register-device', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { token, userId } = req.body;
-    
-    if (!token || !userId) {
-      res.status(400).json({ error: 'Missing required fields' });
-      return;
-    }
-
-    await notificationService.registerDevice(userId, token);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error registering device:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // Initialize WebSocket server with retry logic
 const startWebSocketServer = (retryPort: number = wsPort) => {

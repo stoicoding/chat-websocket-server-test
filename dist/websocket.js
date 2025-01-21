@@ -12,16 +12,16 @@ class WebSocketServer {
     constructor(port, useMockResponses = false) {
         this.clients = new Map();
         this.mockResponses = [
-            "That's interesting! Tell me more.",
-            "I completely understand what you mean.",
-            "Thanks for sharing that!",
-            "How fascinating! I've never thought about it that way.",
-            "That's a great point!",
-            "I see what you mean.",
-            "Let's discuss this further!",
-            "That's really cool!",
-            "I appreciate your perspective on this.",
-            "Interesting thought!"
+            "なるほど、興味深いですね。もっと詳しく教えてください。",
+            "おっしゃる意味がよくわかります。",
+            "それを共有してくださってありがとうございます！",
+            "面白いですね！そういう見方をしたことがありませんでした。",
+            "素晴らしい指摘です！",
+            "なるほど、理解しました。",
+            "それについてもっと議論しましょう！",
+            "すごいですね！",
+            "そのような視点を持っていただき、感謝します。",
+            "興味深い考えですね！"
         ];
         this.wss = new ws_1.default.Server({ port });
         this.useMockResponses = useMockResponses;
